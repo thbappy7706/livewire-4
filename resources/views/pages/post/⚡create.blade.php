@@ -27,6 +27,6 @@ new #[Layout('layouts::app', ['title' => 'Create Post'])] class extends Componen
 
     <flux:textarea wire:model="content" label="Content"/>
 
-    <flux:button type="submit" variant="primary"> Save </flux:button>
+    <flux:button type="submit" variant="primary" color="teal"> Save </flux:button>
 
 </form>
