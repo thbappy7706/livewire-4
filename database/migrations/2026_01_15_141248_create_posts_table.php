@@ -13,9 +13,7 @@ return new class extends Migration
     {
         Schema::create('posts', function (Blueprint $table) {
             $table->id();
-
-            $table->unsignedInteger('author');
-            $table->string('ttile')->nullable();
+            $table->string('title')->nullable();
             $table->string('slug')->nullable();
             $table->text('content')->nullable();
             $table->boolean('status')->default(1);
