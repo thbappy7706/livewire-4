@@ -16,9 +16,9 @@ return new class extends Migration
             $table->string('title')->nullable();
             $table->string('slug')->nullable();
             $table->text('content')->nullable();
+            $table->integer('views')->default(0);
             $table->boolean('status')->default(1);
             $table->date('published_at')->nullable();
-
             $table->timestamps();
         });
     }
