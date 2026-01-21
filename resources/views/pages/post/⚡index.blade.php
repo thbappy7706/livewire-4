@@ -9,51 +9,146 @@ use Livewire\Component;
 use App\Models\Post;
 
 new #[Layout('layouts::app'), Title('Posts')] class extends Component {
+    use WithPagination;
 
+    #[Url] public string $search = '';
+    #[Url] public string $status = 'all';
+    #[Url] public string $sort = 'newest';
+    #[Url] public int $perPage = 9;
+
+    public ?int $pendingDeleteId = null;
+
+    public function updatingSearch(): void { $this->resetPage(); }
+    public function updatingStatus(): void { $this->resetPage(); }
+    public function updatingSort(): void { $this->resetPage(); }
+
+    #[Computed]
+    public function posts()
+    {
+        $query = Post::query();
+
+        if ($this->search !== '') {
+            $query->where(function ($q) {
+                $q->where('title', 'like', "%{$this->search}%")
+                  ->orWhere('content', 'like', "%{$this->search}%");
+            });
+        }
+
+        if ($this->status !== 'all') {
+            $query->where('status', $this->status === 'published');
+        }
+
+        if ($this->sort === 'newest') {
+            $query->latest('created_at');
+        } elseif ($this->sort === 'oldest') {
+            $query->oldest('created_at');
+        } elseif ($this->sort === 'popular') {
+            $query->orderByDesc('views');
+        }
+
+        return $query->paginate($this->perPage);
+    }
+
+    public function clearFilters(): void
+    {
+        $this->reset(['search', 'status', 'sort']);
+        $this->status = 'all';
+        $this->sort = 'newest';
+        $this->resetPage();
+    }
+
+    public function confirmDelete(int $id): void
+    {
+        $this->pendingDeleteId = $id;
+        $this->dispatch('open-modal', name: 'delete-post');
+    }
+
+    public function deleteConfirmed(): void
+    {
+        if ($this->pendingDeleteId) {
+            Post::whereKey($this->pendingDeleteId)->delete();
+            $this->pendingDeleteId = null;
+            $this->dispatch('post-deleted');
+            $this->resetPage();
+        }
+    }
 };
 ?>
 
 <div >
 
-    <!-- Filters Section -->
+    <!-- Toasts -->
+    @if (session('success'))
+        <div class="fixed top-4 right-4 z-50" wire:key="toast-success">
+            <flux:callout variant="success" dismissible>
+                {{ session('success') }}
+            </flux:callout>
+        </div>
+    @endif
+    @if (session('error'))
+        <div class="fixed top-4 right-4 z-50" wire:key="toast-error">
+            <flux:callout variant="danger" dismissible>
+                {{ session('error') }}
+            </flux:callout>
+        </div>
+    @endif
+
+    <!-- Toolbar & Filters -->
     <div class="bg-white dark:bg-zinc-900 rounded-xl shadow-lg border border-zinc-200 dark:border-zinc-700 p-6">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <!-- Search -->
-            <div class=" flex ">
-                <flux:field>
-                    <flux:input
-                        wire:model.live.debounce.300ms="search"
-                        placeholder="Search by title or content..."
-                        icon="magnifying-glass"
-                        class="transition-all duration-200"
-                    />
-                </flux:field>
+        <div class="flex items-center gap-4 flex-wrap">
+            <flux:heading size="xl" class="mr-auto">Posts</flux:heading>
 
+            <flux:field class="min-w-0 flex-1 basis-64">
+                <flux:input
+                    wire:model.live.debounce.300ms="search"
+                    placeholder="Search by title or content..."
+                    icon="magnifying-glass"
+                    class="transition-all duration-200 w-full"
+                    wire:ref="searchInput"
+                />
+            </flux:field>
 
-                <flux:select  wire:model.live="status">
-                    <option>All Posts</option>
-                    <option>Published</option>
-                    <option>Draft</option>
-                </flux:select>
-            </div>
+            <flux:select wire:model.live="status">
+                <option value="all">All Posts</option>
+                <option value="published">Published</option>
+                <option value="draft">Draft</option>
+            </flux:select>
 
-            <!-- Status Filter -->
-            <div>
+            <flux:select wire:model.live="sort">
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+                <option value="popular">Most Viewed</option>
+            </flux:select>
 
+            <flux:button variant="ghost" @click="$wire.$refs.searchInput && $wire.$refs.searchInput.focus()">Focus search</flux:button>
 
+            <flux:button wire:click="clearFilters" variant="ghost">Reset</flux:button>
 
-            </div>
-
-
-
+            <flux:button href="/post/create" wire:navigate variant="primary" icon="plus" data-loading:opacity-50>
+                <span>New post</span>
+                <flux:icon.loading class="not-in-data-loading:hidden" />
+            </flux:button>
+        </div>
     </div>
 
 
 
     <!-- Posts Grid -->
     <div wire:loading.class="opacity-50 pointer-events-none" class="transition-opacity duration-200">
+        <!-- Lazy Islands wrapper for grid -->
+        <div wire:island name="posts-grid">
         @if($this->posts->count() > 0)
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Loading placeholders -->
+                <template wire:loading>
+                    @for($i=0; $i<3; $i++)
+                        <div class="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-6 animate-pulse">
+                            <div class="h-40 bg-zinc-200 dark:bg-zinc-800 rounded mb-4"></div>
+                            <div class="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-3/4 mb-2"></div>
+                            <div class="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-1/2"></div>
+                        </div>
+                    @endfor
+                </template>
                 @foreach ($this->posts as $post)
                     <article
                         wire:key="post-{{ $post->id }}"
@@ -123,19 +218,20 @@ new #[Layout('layouts::app'), Title('Posts')] class extends Component {
                             <div class="flex items-center gap-2">
                                 <flux:button
                                     href="/post/{{ $post->id }}/edit"
+                                    wire:navigate
                                     variant="primary"
                                     size="sm"
                                     class="flex-1"
                                 >
-                                    Edit Post
+                                    Edit post
                                 </flux:button>
-                                <flux:button
-                                    variant="ghost"
-                                    size="sm"
-                                    icon="eye"
-                                    class="text-zinc-600 dark:text-zinc-400"
-                                >
-                                </flux:button>
+
+                                <flux:dropdown>
+
+                                    <div class="p-2">
+                                        <flux:button variant="primary" size="sm" class="w-full justify-start" icon="trash" wire:click="confirmDelete({{ $post->id }})">Delete</flux:button>
+                                    </div>
+                                </flux:dropdown>
                             </div>
                         </div>
 
@@ -175,17 +271,32 @@ new #[Layout('layouts::app'), Title('Posts')] class extends Component {
                             Clear Filters
                         </flux:button>
                     @else
-                        <flux:button href="/post/create" variant="primary" icon="plus">
+                        <flux:button href="/post/create" wire:navigate variant="primary" icon="plus">
                             Create Your First Post
                         </flux:button>
                     @endif
                 </div>
             </div>
         @endif
+        </div>
     </div>
 
-
-</div>
+    <!-- Delete Confirmation Modal (lazy island) -->
+    <div wire:island.lazy wire:key="delete-modal">
+        <flux:modal name="delete-post">
+            <div class="p-4 space-y-4">
+                <flux:heading size="lg">Delete this post?</flux:heading>
+                <p class="text-sm text-zinc-600 dark:text-zinc-400">This action cannot be undone.</p>
+                <div class="flex justify-end gap-2">
+                    <flux:button variant="primary" @click="$dispatch('close-modal', { name: 'delete-post' })">Cancel</flux:button>
+                    <flux:button variant="danger" wire:click="deleteConfirmed" data-loading:opacity-50>
+                        <span>Delete</span>
+                        <flux:icon.loading class="not-in-data-loading:hidden"/>
+                    </flux:button>
+                </div>
+            </div>
+        </flux:modal>
+    </div>
 
 </div>
 

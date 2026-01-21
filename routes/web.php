@@ -7,4 +7,5 @@ Route::get('/', function () {
 });
 
 Route::livewire('post/create', 'pages::post.create');
+Route::livewire('post/{post}/edit', 'pages::post.edit');
 Route::livewire('post', 'pages::post.index');
