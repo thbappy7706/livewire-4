@@ -3,7 +3,8 @@
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return view('welcome');
+    return redirect('/post');
 });
 
 Route::livewire('post/create', 'pages::post.create');
+Route::livewire('post', 'pages::post.index');

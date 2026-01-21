@@ -8,15 +8,17 @@ new #[Layout('layouts::app', ['title' => 'Create Post'])] class extends Componen
 {
     public $title = '';
     public $content = '';
+    public $status = false;
 
     public function save()
     {
         Post::create($this->validate([
             'title' => 'required|min:3',
-            'content' => 'required'
+            'content' => 'required',
+            'status' => 'nullable|boolean',
         ]));
 
-        $this->redirect('/');
+        $this->redirect('/post');
     }
 };
 ?>
@@ -26,6 +28,15 @@ new #[Layout('layouts::app', ['title' => 'Create Post'])] class extends Componen
     <flux:input wire:model="title" label="Title" />
 
     <flux:textarea wire:model="content" label="Content"/>
+
+    <flux:fieldset>
+        <flux:legend>Choose Status</flux:legend>
+        <div class="flex gap-4 *:gap-x-2">
+            <flux:checkbox  value="1"  wire:model.boolean="status" label="Published" />
+        </div>
+    </flux:fieldset>
+
+
 
 {{--    <flux:button type="submit" variant="primary" color="teal"> Save </flux:button>--}}
 

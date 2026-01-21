@@ -20,6 +20,7 @@ class PostFactory extends Factory
         return [
             'title' => $title,
             'slug' => Str::slug($title),
+            'image' => 'https://picsum.photos/seed/' . $this->faker->numberBetween(1, 1000) . '/800/600',
             'content' => $this->faker->paragraphs(4, true),
             'views' => $this->faker->numberBetween(0, 5000),
             'status' => $this->faker->boolean(80), // 80% active
